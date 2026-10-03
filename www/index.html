@@ -450,6 +450,15 @@
     const d = new Date();
     return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
   };
+    const format12Hour = (time24) => {
+    if (!time24) return '';
+    let [h, m] = time24.split(':');
+    let hours = parseInt(h, 10);
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12 || 12;
+    return hours + ':' + m + ' ' + ampm;
+  };
+
   const keyFor = date => 'stops-' + date;
 
   let patientCount = 0;
@@ -667,7 +676,7 @@ $('saveStop').onclick = async () => {$('saveStop').disabled = true;
   const stop = {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2,7),
     office: $('office').value.trim(),
-    time: $('time').value || liveTime,
+    time: format12Hour($('time').value || liveTime),
     patients: ($('isPickup') &&$('isPickup').checked)
       ? ['Pickup']
       : Array.from(document.querySelectorAll('.patient-input')).map(i=>i.value.trim()).filter(Boolean),
@@ -766,7 +775,7 @@ async function preparePrint(){
   }
   $('printPreviewNote').style.display = 'none';
   const now = new Date();
-  const liveStamp = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+  const liveStamp = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: true});
   const d = new Date(date + 'T00:00:00');
 
   $('pTitle').textContent = 'Daily Deliveries - ' + d.toLocaleDateString(undefined, {weekday:'long', year:'numeric', month:'long', day:'numeric'});$('pSub').textContent = `${stops.length} stop${stops.length > 1 ? 's' : ''} • Logged ${liveStamp}`;
@@ -840,7 +849,7 @@ $('doPrint').onclick = async () => {
       });
 
       await Share.share({
-        title: 'Daily Delivery Log',
+        title: filename,
         text: 'Delivery manifest for ' + date,
         url: fileResult.uri,
         dialogTitle: 'Save or Share Route Manifest'
