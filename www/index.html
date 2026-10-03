@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Delivery Log">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1F6F5C">
+<title>Delivery Log</title>
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="./localforage.js"></script>
+<style>
+  :root{
+    --ink:#24262B;
+    --paper:#EFEDE6;
+    --panel:#FFFFFF;
+    --line:#D8D4C8;
+    --teal:#1F6F5C;
+    --teal-dark:#15503F;
+    --rust:#B5651D;
+    --muted:#6B6B63;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Barlow',system-ui,sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #app{max-width:520px;margin:0 auto;padding-bottom:96px;}
+
+  header.top{
+    padding:20px 18px 14px;
+    border-bottom:3px solid var(--ink);
+    cursor:pointer;
+  }
+  header.top:active{
+    background:rgba(0,0,0,0.05);
+  }
+  header.top h1{
+    font-family:'Barlow Condensed',sans-serif;
+    font-weight:700;
+    font-size:30px;
+    letter-spacing:0.02em;
+    margin:0;
+  }
+  header.top .sub{
+    font-size:14px;
+    color:var(--muted);
+    margin-top:2px;
+  }
+
+  nav.tabs{
+    display:flex;
+    position:sticky;
+    top:0;
+    background:var(--paper);
+    z-index:5;
+    border-bottom:1px solid var(--line);
+  }
+  nav.tabs button{
+    flex:1;
+    padding:14px 6px;
+    background:none;
+    border:none;
+    font-family:'Barlow Condensed',sans-serif;
+    font-size:17px;
+    font-weight:600;
+    color:var(--muted);
+    letter-spacing:0.02em;
+    border-bottom:3px solid transparent;
+  }
+  nav.tabs button.active{
+    color:var(--ink);
+    border-bottom:3px solid var(--teal);
+  }
+
+  main{padding:16px;}
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:16px;
+    margin-bottom:14px;
+  }
+
+  label{
+    display:block;
+    font-family:'Barlow Condensed',sans-serif;
+    font-size:15px;
+    font-weight:600;
+    color:var(--muted);
+    margin-bottom:6px;
+  }
+  
+  /* THE APPLE NUCLEAR OPTION: Strips native formatting */
+  input[type=text], input[type=date], input[type=time]{
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    -webkit-box-sizing: border-box; 
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0 0 14px 0;
+    font-size: 18px;
+    font-family: 'Barlow', sans-serif;
+    padding: 13px 12px;
+    border: 1.5px solid var(--line);
+    border-radius: 4px;
+    background: #fff;
+    color: var(--ink);
+  }
+  input:focus{outline:2px solid var(--teal); outline-offset:1px;}
+
+  /* Flexible side-by-side row that wraps if Apple resists */
+  .row2{display:flex; flex-wrap: wrap; gap:10px;}
+  .row2 > div{flex:1; min-width: 130px;}
+
+  .patient-row{
+    display:flex;
+    gap:8px;
+    margin-bottom:10px;
+    align-items:center;
+  }
+  .patient-row input{margin-bottom:0; flex:1;}
+  .icon-btn{
+    width:44px;height:44px;
+    border-radius:4px;
+    border:1.5px solid var(--line);
+    background:#fff;
+    font-size:22px;
+    line-height:1;
+    color:var(--ink);
+    flex-shrink:0;
+  }
+  .add-patient{
+    width:100%;
+    padding:12px;
+    border:1.5px dashed var(--line);
+    border-radius:4px;
+    background:none;
+    color:var(--teal-dark);
+    font-family:'Barlow Condensed',sans-serif;
+    font-weight:600;
+    font-size:16px;
+    margin-bottom:6px;
+  }
+
+  .sig-wrap{
+    border:1.5px solid var(--line);
+    border-radius:4px;
+    background:#fff;
+    position:relative;
+    touch-action:none;
+  }
+  .sig-wrap canvas{display:block; width:100%; height:180px; touch-action:none;}
+  .sig-label-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:6px;
+  }
+  .sig-placeholder{
+    position:absolute;
+    top:50%; left:0; right:0;
+    text-align:center;
+    transform:translateY(-50%);
+    color:#B9B6AA;
+    font-size:15px;
+    pointer-events:none;
+  }
+  .clear-link{
+    background:none;border:none;
+    color:var(--rust);
+    font-size:14px;
+    font-family:'Barlow Condensed',sans-serif;
+    font-weight:600;
+    padding:4px;
+  }
+
+  .form-actions{
+    display:flex;
+    gap:10px;
+    margin-top:16px;
+  }
+  .save-btn{
+    flex:2;
+    padding:16px;
+    background:var(--teal);
+    color:#fff;
+    border:none;
+    border-radius:4px;
+    font-family:'Barlow Condensed',sans-serif;
+    font-weight:700;
+    font-size:19px;
+    letter-spacing:0.02em;
+  }
+  .save-btn:active{background:var(--teal-dark);}
+  .save-btn:disabled{background:#B9B6AA;}
+
+  .reset-btn{
+    flex:1;
+    padding:16px;
+    background:none;
+    color:var(--rust);
+    border:1.5px solid var(--rust);
+    border-radius:4px;
+    font-family:'Barlow Condensed',sans-serif;
+    font-weight:700;
+    font-size:17px;
+  }
+
+  .count-pill{
+    display:inline-block;
+    font-family:'Barlow Condensed',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    background:var(--ink);
+    color:#fff;
+    padding:3px 10px;
+    border-radius:20px;
+  }
+
+  .toast{
+    position:fixed;
+    left:50%; bottom:24px;
+    transform:translateX(-50%);
+    background:var(--ink);
+    color:#fff;
+    padding:12px 20px;
+    border-radius:6px;
+    font-size:15px;
+    opacity:0;
+    transition:opacity .25s;
+    pointer-events:none;
+    z-index:50;
+  }
+  .toast.show{opacity:1;}
+
+  .stop-card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:4px;
+    margin-bottom:12px;
+    overflow:hidden;
+  }
+  .stop-card .stop-head{
+    padding:14px 16px;
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:10px;
+  }
+  .stop-num{
+    font-family:'Barlow Condensed',sans-serif;
+    font-weight:700;
+    color:var(--teal-dark);
+    font-size:15px;
+  }
+  .stop-office{
+    font-size:19px;
+    font-weight:600;
+    margin-top:2px;
+  }
+  .stop-meta{
+    color:var(--muted);
+    font-size:14px;
+    margin-top:2px;
+  }
+  .stop-patients{
+    font-size:15px;
+    margin-top:6px;
+  }
+  .stop-thumb{
+    width:88px;
+    height:44px;
+    border:1px solid var(--line);
+    border-radius:3px;
+    background:#fff repeat;
+    object-fit:contain;
+    flex-shrink:0;
+  }
+  .stop-actions{
+    border-top:1px solid var(--line);
+    display:flex;
+  }
+  .stop-actions button{
+    flex:1;
+    padding:11px;
+    background:none;
+    border:none;
+    font-family:'Barlow Condensed',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    color:var(--muted);
+  }
+  .stop-actions button.danger{color:var(--rust);}
+  .stop-actions button + button{border-left:1px solid var(--line);}
+
+  .empty{
+    text-align:center;
+    padding:60px 20px;
+    color:var(--muted);
+  }
+  .empty .big{font-size:40px; margin-bottom:8px;}
+
+  .date-select{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:16px;
+  }
+  .date-select input{margin-bottom:0;}
+
+  .print-btn{
+    width:100%;
+    padding:15px;
+    background:var(--ink);
+    color:#fff;
+    border:none;
+    border-radius:4px;
+    font-family:'Barlow Condensed',sans-serif;
+    font-weight:700;
+    font-size:17px;
+    margin-bottom:18px;
+  }
+
+  #printSheet{display:none;}
+
+  .p-title{font-family:'Barlow Condensed',sans-serif; font-size:22px; font-weight:700; margin-bottom:2px;}
+  .p-sub{color:#555; font-size:13px; margin-bottom:16px;}
+  .p-stop{display:flex; justify-content:space-between; align-items:center; gap:14px; padding:8px 0; border-bottom:1px solid #ccc;}
+  .p-left{flex:1;}
+  .p-office{font-weight:700; font-size:15px;}
+  .p-meta{font-size:12px; color:#555;}
+  .p-sig{width:130px; height:50px; border:1px solid #aaa; object-fit:contain; background:#fff;}
+</style>
+</head>
+
+ <body>
+<div id="app">
+  <header class="top" onclick="window.location.reload()">
+    <h1>DELIVERY LOG</h1>
+    <div class="sub">Signature capture &bull; <strong>Tap here to refresh</strong></div>
+  </header>
+
+  <nav class="tabs">
+    <button id="tabForm" class="active">New Stop</button>
+    <button id="tabList">Today <span id="tabCount"></span></button>
+    <button id="tabPrint">Send</button>
+  </nav>
+
+  <main>
+    <!-- FORM VIEW -->
+    <div id="formView">
+      <div class="panel">
+        <label for="office">Dentist office</label>
+        <input type="text" id="office" placeholder="e.g. Riverside Dental" autocomplete="off">
+
+        <div class="row2">
+          <div>
+            <label for="date">Date</label>
+            <input type="date" id="date">
+          </div>
+          <div>
+            <label for="time">Time</label>
+            <input type="time" id="time">
+          </div>
+        </div>
+
+        <label style="display:flex; align-items:center; gap:8px; margin:14px 0 10px; cursor:pointer; font-weight:600; font-size:15px;">
+          <input type="checkbox" id="isPickup" style="width:20px; height:20px; accent-color:var(--rust, #B5651D);">
+          Pickup only (no patient names)
+        </label>
+
+        <div id="patientSection">
+          <label>Patient name(s)</label>
+          <div id="patientRows"></div>
+          <button type="button" class="add-patient" id="addPatient">+ Add another patient</button>
+        </div>
+      </div>
+
+      <div class="panel" id="sigPanel">
+        <div class="sig-label-row">
+          <label style="margin-bottom:0;">Receptionist signature</label>
+          <button type="button" class="clear-link" id="clearSig">Clear</button>
+        </div>
+        <div class="sig-wrap" id="sigWrap">
+          <canvas id="sigCanvas"></canvas>
+          <div class="sig-placeholder" id="sigPlaceholder">Sign here with finger</div>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="reset-btn" id="resetStop">Reset</button>
+        <button class="save-btn" id="saveStop" disabled>Save stop</button>
+      </div>
+    </div>
+
+    <!-- LIST VIEW -->
+    <div id="listView" style="display:none;">
+      <div class="date-select">
+        <label style="margin-bottom:0;">Showing:</label>
+        <input type="date" id="listDate">
+      </div>
+      <button type="button" class="print-btn" id="deleteAllStops" style="background:var(--rust); margin-bottom: 16px; display: none;">Delete All Stops</button>
+      <div id="listContent"></div>
+    </div>
+
+    <!-- SEND VIEW -->
+    <div id="printView" style="display:none;">
+      <div class="date-select">
+        <label style="margin-bottom:0;">Date:</label>
+        <input type="date" id="printDate">
+      </div>
+      <button class="print-btn" id="doPrint">Generate PDF</button>
+      <button class="print-btn" id="doEmail" style="margin-top: 10px; background: var(--rust, #B5651D);">Email Daily Report</button>
+
+      <div id="printPreviewNote" class="empty" style="display:none;">
+        <div class="big">✉️</div>
+        No stops saved for this date yet.
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="printSheet">
+  <div class="p-title" id="pTitle"></div>
+  <div class="p-sub" id="pSub"></div>
+  <div id="pStops"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const todayStr = () => {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  };
+  const nowTimeStr = () => {
+    const d = new Date();
+    return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  };
+  const keyFor = date => 'stops-' + date;
+
+  let patientCount = 0;
+  let generatedPdfFile = null; // Holds the PDF file once it is built
+
+  // ---------- Tabs ----------
+  function setTab(name){
+    $('tabForm').classList.toggle('active', name==='form');$('tabList').classList.toggle('active', name==='list');
+    $('tabPrint').classList.toggle('active', name==='print');$('formView').style.display = name==='form' ? 'block':'none';
+    $('listView').style.display = name==='list' ? 'block':'none';$('printView').style.display = name==='print' ? 'block':'none';
+    if(name==='form'){
+      $('time').value = nowTimeStr();
+    }
+    if(name==='list'){ 
+      $('listDate').value =$('date').value || todayStr(); 
+      loadList(); 
+    }
+    if(name==='print'){ 
+      $('printDate').value =$('date').value || todayStr(); 
+      generatedPdfFile = null;
+      $('doPrint').textContent = 'Generate PDF';
+      $('doPrint').style.background = 'var(--ink)';
+      preparePrint();
+    }
+  }
+  $('tabForm').onclick = ()=>setTab('form');
+  $('tabList').onclick = ()=>setTab('list');$('tabPrint').onclick = ()=>setTab('print');
+
+  // ---------- Patient rows ----------
+  function addPatientRow(value){
+    patientCount++;
+    const row = document.createElement('div');
+    row.className = 'patient-row';
+    
+    const uniqueId = 'patient_input_' + Math.random().toString(36).substring(2, 9);
+    
+    row.innerHTML = `<input type="text" id="${uniqueId}" name="${uniqueId}" placeholder="Patient name" class="patient-input"
+      autocomplete="new-password" autocapitalize="words" autocorrect="off" spellcheck="false"
+      value="${value ? value.replace(/"/g,'&quot;') : ''}">
+      <button type="button" class="icon-btn remove-patient" aria-label="Remove">−</button>`;
+      
+    $('patientRows').appendChild(row);
+    row.querySelector('.remove-patient').onclick = () => {
+      if($('patientRows').children.length > 1){
+        row.remove();
+      } else {
+        row.querySelector('input').value = '';
+      }
+      validateForm();
+    };
+    row.querySelector('input').addEventListener('input', validateForm);
+  }
+  $('addPatient').onclick = () => addPatientRow('');$('isPickup').addEventListener('change', (e) => {
+    const isChecked = e.target.checked;
+    $('patientSection').style.display = isChecked ? 'none' : 'block';
+    $('sigPanel').style.display = isChecked ? 'none' : 'block';
+    validateForm();
+  });
+
+  // ---------- Signature pad ----------
+  const canvas = $('sigCanvas');
+  const ctx = canvas.getContext('2d');
+  let drawing = false, hasSig = false;
+  let lastX = 0, lastY = 0;
+
+  function resizeCanvas(){
+    const wrap = $('sigWrap');
+    const ratio = window.devicePixelRatio || 1;
+    const w = wrap.clientWidth;
+    const h = 180;
+    canvas.width = w * ratio;
+    canvas.height = h * ratio;
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(ratio, ratio);
+    ctx.lineWidth = 2.4;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#1C2333';
+  }
+  resizeCanvas();
+
+  window.addEventListener('resize', () => {
+    const data = hasSig ? canvas.toDataURL() : null;
+    resizeCanvas();
+    if(data){
+      const img = new Image();
+      img.onload = () => ctx.drawImage(img, 0, 0, canvas.width / (window.devicePixelRatio||1), canvas.height / (window.devicePixelRatio||1));
+      img.src = data;
+    }
+  });
+
+  function pointerPos(e){
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    };
+  }
+
+  function start(e){
+    e.preventDefault();
+    canvas.setPointerCapture(e.pointerId);
+    drawing = true;
+    const p = pointerPos(e);
+    lastX = p.x; 
+    lastY = p.y;
+    $('sigPlaceholder').style.display = 'none';
+  }
+
+  function move(e){
+    if(!drawing) return;
+    e.preventDefault();
+    const p = pointerPos(e);
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    lastX = p.x; 
+    lastY = p.y;
+    hasSig = true;
+    validateForm();
+  }
+
+  function end(e){
+    if(!drawing) return;
+    drawing = false;
+    try { canvas.releasePointerCapture(e.pointerId); } catch(err) {}
+    validateForm();
+  }
+
+  canvas.addEventListener('pointerdown', start);
+  canvas.addEventListener('pointermove', move);
+  canvas.addEventListener('pointerup', end);
+  canvas.addEventListener('pointercancel', end);
+
+  function clearSignature(){
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    hasSig = false;
+    $('sigPlaceholder').style.display = 'block';
+    validateForm();
+  }
+  $('clearSig').onclick = clearSignature;
+
+  // ---------- Form Controls & Reset ----------
+  function resetForm(){
+    $('office').value = '';$('patientRows').innerHTML = '';
+    addPatientRow('');
+    $('date').value = todayStr();$('time').value = nowTimeStr();
+    clearSignature();
+    if ($('isPickup')) {$('isPickup').checked = false;
+      $('patientSection').style.display = 'block';$('sigPanel').style.display = 'block'; 
+    }
+    validateForm();
+  }
+
+  $('resetStop').onclick = () => {
+    if(confirm('Clear this stop? All entered information and signatures will be lost.')) {
+      resetForm();
+    }
+  };
+
+  function validateForm(){
+    const office = $('office').value.trim();
+    const isPickup = $('isPickup') &&$('isPickup').checked;
+    const patients = Array.from(document.querySelectorAll('.patient-input')).map(i=>i.value.trim()).filter(Boolean);
+    const validPatients = isPickup || patients.length > 0;
+    const validSig = isPickup || hasSig;
+    $('saveStop').disabled = !(office && validPatients && validSig);
+  }
+
+  $('office').addEventListener('input', validateForm);
+
+  function toast(msg){
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'), 1800);
+  }
+
+  // ---------- Storage helpers ----------
+async function getStops(date){
+  try{
+    if (typeof localforage !== 'undefined') {
+      const raw = await localforage.getItem(keyFor(date));
+      if (raw) return JSON.parse(raw);
+    }
+    const rawLocal = localStorage.getItem(keyFor(date));
+    return rawLocal ? JSON.parse(rawLocal) : [];
+  }catch(e){
+    return [];
+  }
+}
+
+async function setStops(date, stops){
+  try{
+    const val = JSON.stringify(stops);
+    if (typeof localforage !== 'undefined') {
+      await localforage.setItem(keyFor(date), val);
+      return true;
+    }
+    localStorage.setItem(keyFor(date), val);
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+
+  // ---------- Save stop ----------
+$('saveStop').onclick = async () => {$('saveStop').disabled = true;
+  $('saveStop').textContent = 'Saving...';
+  const date = $('date').value || todayStr();
+  const liveTime = nowTimeStr();
+  const stop = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2,7),
+    office: $('office').value.trim(),
+    time: $('time').value || liveTime,
+    patients: ($('isPickup') &&$('isPickup').checked)
+      ? ['Pickup']
+      : Array.from(document.querySelectorAll('.patient-input')).map(i=>i.value.trim()).filter(Boolean),
+    signature: hasSig ? canvas.toDataURL('image/png') : '',
+    savedAt: new Date().toISOString()
+  };
+  const existing = await getStops(date);
+  existing.push(stop);
+  const ok = await setStops(date, existing);
+  if(ok){
+    toast('Saved: ' + stop.office);
+    resetForm();
+    updateTabCount(date);
+  } else {
+    toast('Storage full or error saving.');
+  }
+  $('saveStop').textContent = 'Save stop';
+  validateForm();
+};
+
+async function updateTabCount(date){
+  const stops = await getStops(date);
+  $('tabCount').textContent = stops.length ? '(' + stops.length + ')' : '';
+}
+
+  // ---------- List view ----------
+async function loadList(){
+  const date = $('listDate').value || todayStr();
+  const stops = await getStops(date);
+  const content = $('listContent');
+  if(!stops.length){
+    content.innerHTML = '<div class="empty"><div class="big">📋</div>No stops saved for this date yet.</div>';
+    $('deleteAllStops').style.display = 'none';
+    return;
+  }
+  $('deleteAllStops').style.display = 'block';
+
+  content.innerHTML = stops.map((s,i) => `
+    <div class="stop-card">
+      <div class="stop-head">
+        <div>
+          <div class="stop-num">STOP ${i+1}</div>
+          <div class="stop-office">${escapeHtml(s.office)}</div>
+          <div class="stop-meta">${s.time}</div>
+          <div class="stop-patients">${s.patients.map(escapeHtml).join(', ')}</div>
+        </div>
+        ${s.signature ? `<img class="stop-thumb" src="${s.signature}" alt="signature">` : ''}
+      </div>
+      <div class="stop-actions">
+        <button class="danger" data-del="${s.id}">Delete</button>
+      </div>
+    </div>
+  `).join('');
+  
+  content.querySelectorAll('[data-del]').forEach(btn=>{
+    btn.onclick = async () => {
+      if(!confirm('Delete this stop?')) return;
+      const date = $('listDate').value || todayStr();
+      const currentStops = await getStops(date);
+      const filtered = currentStops.filter(s=>s.id !== btn.getAttribute('data-del'));
+      await setStops(date, filtered);
+      loadList();
+      updateTabCount(date);
+    };
+  });
+}
+
+$('listDate').addEventListener('change', loadList);
+
+$('deleteAllStops').onclick = async () => {
+  const date = $('listDate').value || todayStr();
+  const stops = await getStops(date);
+  if(!stops.length) return;
+
+  if(confirm(`Are you sure you want to permanently delete ALL ${stops.length} stops for ${date}?`)){
+    await setStops(date, []);
+    loadList();
+    updateTabCount(date);
+    toast('All stops deleted.');
+  }
+};
+
+function escapeHtml(str){
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+  // ---------- Send / PDF view ----------
+async function preparePrint(){
+  const date = $('printDate').value || todayStr();
+  const stops = await getStops(date);
+  if(!stops.length){
+    $('printPreviewNote').style.display = 'block';$('pStops').innerHTML = '';
+    return false;
+  }
+  $('printPreviewNote').style.display = 'none';
+  const now = new Date();
+  const liveStamp = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+  const d = new Date(date + 'T00:00:00');
+
+  $('pTitle').textContent = 'Daily Deliveries - ' + d.toLocaleDateString(undefined, {weekday:'long', year:'numeric', month:'long', day:'numeric'});$('pSub').textContent = `${stops.length} stop${stops.length > 1 ? 's' : ''} • Logged ${liveStamp}`;
+
+  $('pStops').innerHTML = stops.map((s,i)=>`
+    <div class="p-stop">
+      <div class="p-left">
+        <div class="p-office">${i+1}. ${escapeHtml(s.office)}</div>
+        <div class="p-meta">${s.time} - ${s.patients.map(escapeHtml).join(', ')}</div>
+      </div>
+      ${s.signature ? `<img class="p-sig" src="${s.signature}" alt="signature">` : ''}
+    </div>
+  `).join('');
+  return true;
+}
+
+// Reset the PDF if they change the date
+$('printDate').addEventListener('change', () => {
+  generatedPdfFile = null;
+  const btn = $('doPrint');
+  btn.textContent = 'Generate PDF';
+  btn.style.background = 'var(--ink)';
+  preparePrint();
+});
+
+$('doPrint').onclick = async () => {
+  const btn = $('doPrint');
+  const isReady = await preparePrint();
+  if(!isReady) return;
+
+  btn.textContent = 'Generating PDF (Please wait)...';
+  btn.disabled = true;
+
+  const date = $('printDate').value || todayStr();
+  const filename = 'DeliveryLog-' + date + '.pdf';
+  
+  $('app').style.display = 'none';
+  const sheet = $('printSheet');
+  sheet.style.display = 'block';
+  sheet.style.padding = '20px';
+  sheet.style.background = '#fff';
+
+  const opt = {
+    margin:       0.5,
+    filename:     filename,
+    image:        { type: 'jpeg', quality: 0.98 },
+    html2canvas:  { scale: 2, useCORS: true },
+    jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+  };
+
+  html2pdf().set(opt).from(sheet).toPdf().get('pdf').then(async function (pdf) {
+    const dataUri = pdf.output('datauristring');
+    const base64Data = dataUri.split(',')[1]; 
+
+    sheet.style.display = 'none';
+    sheet.style.padding = '';
+    sheet.style.background = '';
+    $('app').style.display = 'block';
+
+    try {
+      if (!window.Capacitor || !window.Capacitor.Plugins) {
+        throw new Error("Native bridge not found. Must run on Android.");
+      }
+      
+      const { Filesystem, Share } = window.Capacitor.Plugins;
+      
+      const fileResult = await Filesystem.writeFile({
+        path: filename,
+        data: base64Data,
+        directory: 'CACHE' 
+      });
+
+      await Share.share({
+        title: 'Daily Delivery Log',
+        text: 'Delivery manifest for ' + date,
+        url: fileResult.uri,
+        dialogTitle: 'Save or Share Route Manifest'
+      });
+
+      btn.textContent = 'Generate PDF';
+      btn.disabled = false;
+
+    } catch (error) {
+      console.error('Error saving native PDF:', error);
+      alert('Native Error: ' + error.message);
+      btn.textContent = 'Generate PDF';
+      btn.disabled = false;
+    }
+
+  }).catch(err => {
+    console.error(err);
+    alert('Error creating PDF.');
+    
+    sheet.style.display = 'none';
+    sheet.style.padding = '';
+    sheet.style.background = '';
+    $('app').style.display = 'block';
+    
+    btn.textContent = 'Generate PDF';
+    btn.disabled = false;
+  });
+};
+
+
+  const OFFICE_EMAIL = 'ceramics@mccluredentallabdesign.com';
+
+  $('doEmail').onclick = async () => {
+    const d = $('printDate').value || todayStr();
+    const stops = await getStops(d);
+    if (!stops.length) {
+      alert('No stops recorded for this date to email.');
+      return;
+    }
+    const subject = encodeURIComponent(`Delivery Log Report - ${d}`);
+    const body = encodeURIComponent(
+      `Attached is the McClure Dental delivery log for ${d}.\nTotal stops completed: ${stops.length}\n\n(Please attach the saved PDF if prompted)`
+    );
+    window.location.href = `mailto:${OFFICE_EMAIL}?subject=${subject}&body=${body}`;
+  };
+
+  // ---------- Init ----------
+  $('date').value = todayStr();$('time').value = nowTimeStr();
+  addPatientRow('');
+  updateTabCount(todayStr());
+
+  // ---------- Automated Storage Cleanup (14-day rolling window) ----------
+  (function performAutomatedCleanup(){
+    const RETENTION_DAYS = 14; 
+    const now = new Date();
+    const prefix = 'stops-';
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(prefix)) {
+        const datePart = key.substring(prefix.length);
+        const parts = datePart.split('-');
+        const fileDate = new Date(parts[0], parts[1]-1, parts[2]);
+
+        if (!isNaN(fileDate.getTime())) {
+          const diffTime = now - fileDate;
+          const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+          if (diffDays > RETENTION_DAYS) {
+            localStorage.removeItem(key);
+          }
+        }
+      }
+    }
+  })();
+
+  // ---------- Service Worker Registration ----------
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(err => console.error('SW failed', err));
+    });
+  }
+})();
+</script>
+</body>
+</html>
