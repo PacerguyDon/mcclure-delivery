@@ -891,7 +891,7 @@ $('doPrint').onclick = async () => {
     }
     const subject = encodeURIComponent(`Delivery Log Report - ${d}`);
     const body = encodeURIComponent(
-      `Attached is the McClure Dental delivery log for ${d}.\nTotal stops completed: ${stops.length}\n\n(Please attach the saved PDF if prompted)`
+      `Attached is the McClure Dental delivery log for ${d}.\nTotal stops completed: ${stops.length}\n\n(Please attach the daily delivery PDF before sending)`
     );
     window.location.href = `mailto:${OFFICE_EMAIL}?subject=${subject}&body=${body}`;
   };
