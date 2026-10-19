@@ -886,11 +886,30 @@ $('doPrint').onclick = async () => {
                 dialogTitle: 'Save or Share Route Manifest'
             });
 
-        } else {
-            // --- WEB BROWSER FALLBACK (iPhones/Safari) ---
-            // This is the standard html2pdf method that works in Safari
-            pdf.save(filename);
-        }
+       } else {
+    // --- WEB BROWSER FALLBACK (iPhones/Safari) ---
+    const dataUri = pdf.output('datauristring');
+    
+    fetch(dataUri)
+        .then(res => res.blob())
+        .then(blob => {
+            const file = new File([blob], filename, { type: 'application/pdf' });
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                navigator.share({
+                    files: [file],
+                    title: 'Daily Log'
+                });
+            } else {
+                const link = document.createElement('a');
+                link.href = dataUri;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        });
+}
+
 
         // Reset button state on success
         btn.textContent = 'Generate PDF';
