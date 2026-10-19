@@ -640,33 +640,58 @@
     setTimeout(()=>t.classList.remove('show'), 1800);
   }
 
-  // ---------- Storage helpers ----------
-async function getStops(date){
-  try{
-    if (typeof localforage !== 'undefined') {
-      const raw = await localforage.getItem(keyFor(date));
-      if (raw) return JSON.parse(raw);
+ // ---------- Storage helpers ----------
+async function getStops(date) {
+    try {
+        if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+            // --- NATIVE ANDROID SQLITE LOGIC ---
+            // You will write your SQLite SELECT queries here using window.NativeDB
+            // (e.g., const res = await window.NativeDB.query(`SELECT * FROM route_stops...`))
+            
+            // Temporary fallback until your SQLite queries are written:
+            if (typeof localforage !== 'undefined') {
+                const raw = await localforage.getItem(keyFor(date));
+                if (raw) return JSON.parse(raw);
+            }
+            return [];
+            
+        } else {
+            // --- WEB BROWSER FALLBACK (iPhones/Safari) ---
+            if (typeof localforage !== 'undefined') {
+                const raw = await localforage.getItem(keyFor(date));
+                if (raw) return JSON.parse(raw);
+            }
+            const rawLocal = localStorage.getItem(keyFor(date));
+            return rawLocal ? JSON.parse(rawLocal) : [];
+        }
+    } catch(e) {
+        return [];
     }
-    const rawLocal = localStorage.getItem(keyFor(date));
-    return rawLocal ? JSON.parse(rawLocal) : [];
-  }catch(e){
-    return [];
-  }
 }
 
-async function setStops(date, stops){
-  try{
-    const val = JSON.stringify(stops);
-    if (typeof localforage !== 'undefined') {
-      await localforage.setItem(keyFor(date), val);
-      return true;
+async function setStops(date, stops) {
+    try {
+        if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+            // --- NATIVE ANDROID SQLITE LOGIC ---
+            // You will write your SQLite INSERT queries here using window.NativeDB
+            // (e.g., await window.NativeDB.execute(`INSERT INTO route_stops...`))
+            
+            return true;
+        } else {
+            // --- WEB BROWSER FALLBACK (iPhones/Safari) ---
+            const val = JSON.stringify(stops);
+            if (typeof localforage !== 'undefined') {
+                await localforage.setItem(keyFor(date), val);
+                return true;
+            }
+            localStorage.setItem(keyFor(date), val);
+            return true;
+        }
+    } catch(e) {
+        return false;
     }
-    localStorage.setItem(keyFor(date), val);
-    return true;
-  }catch(e){
-    return false;
-  }
 }
+
 
   // ---------- Save stop ----------
 $('saveStop').onclick = async () => {$('saveStop').disabled = true;
