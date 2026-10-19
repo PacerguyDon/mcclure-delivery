@@ -851,49 +851,62 @@ $('doPrint').onclick = async () => {
     jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
   };
 
-  html2pdf().set(opt).from(sheet).toPdf().get('pdf').then(async function (pdf) {
-    const dataUri = pdf.output('datauristring');
-    const base64Data = dataUri.split(',')[1]; 
-
+ html2pdf().set(opt).from(sheet).toPdf().get('pdf').then(async function (pdf) {
+    // Reset the UI immediately after generation
     sheet.style.display = 'none';
     sheet.style.padding = '';
     sheet.style.background = '';
     $('app').style.display = 'block';
 
     try {
-      if (!window.Capacitor || !window.Capacitor.Plugins) {
-        throw new Error("Native bridge not found. Must run on Android.");
-      }
-      
-      const { Filesystem, Share } = window.Capacitor.Plugins;
-      
-      const fileResult = await Filesystem.writeFile({
-        path: filename,
-        data: base64Data,
-        directory: 'CACHE' 
-      });
+        if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+            // --- NATIVE ANDROID PDF HANDLING ---
+            const dataUri = pdf.output('datauristring');
+            const base64Data = dataUri.split(',')[1];
+            
+            // We use the globally exposed plugins from app.js
+            const Filesystem = window.NativeFilesystem;
+            const Share = window.NativeShare;
 
-      await Share.share({
-        title: filename,
-        text: 'Delivery manifest for ' + date,
-        url: fileResult.uri,
-        dialogTitle: 'Save or Share Route Manifest'
-      });
+            
+            if (!Filesystem || !Share) {
+                throw new Error("Native plugins not loaded properly.");
+            }
 
-      btn.textContent = 'Generate PDF';
-      btn.disabled = false;
+            const fileResult = await Filesystem.writeFile({
+                path: filename,
+                data: base64Data,
+                directory: 'CACHE' // or window.NativeDirectory.Cache
+            });
+
+            await Share.share({
+                title: filename,
+                text: 'Delivery manifest for ' + date,
+                url: fileResult.uri,
+                dialogTitle: 'Save or Share Route Manifest'
+            });
+
+        } else {
+            // --- WEB BROWSER FALLBACK (iPhones/Safari) ---
+            // This is the standard html2pdf method that works in Safari
+            pdf.save(filename);
+        }
+
+        // Reset button state on success
+        btn.textContent = 'Generate PDF';
+        btn.disabled = false;
 
     } catch (error) {
-      console.error('Error saving native PDF:', error);
-      alert('Native Error: ' + error.message);
-      btn.textContent = 'Generate PDF';
-      btn.disabled = false;
+        console.error('Error saving PDF:', error);
+        alert('Error: ' + error.message);
+        btn.textContent = 'Generate PDF';
+        btn.disabled = false;
     }
-
-  }).catch(err => {
+}).catch(err => {
     console.error(err);
     alert('Error creating PDF.');
     
+    // Reset UI on critical failure
     sheet.style.display = 'none';
     sheet.style.padding = '';
     sheet.style.background = '';
@@ -901,7 +914,8 @@ $('doPrint').onclick = async () => {
     
     btn.textContent = 'Generate PDF';
     btn.disabled = false;
-  });
+});
+
 };
 
 
