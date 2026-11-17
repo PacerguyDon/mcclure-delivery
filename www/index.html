@@ -875,8 +875,8 @@ $('doPrint').onclick = async () => {
             const base64Data = dataUri.split(',')[1];
             
             // We use the globally exposed plugins from app.js
-            const Filesystem = window.NativeFilesystem;
-            const Share = window.NativeShare;
+            const Filesystem = window.NativeFilesystem || (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem);
+            const Share = window.NativeShare || (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Share);
 
             
             if (!Filesystem || !Share) {
