@@ -1,8 +1,9 @@
-const CACHE_NAME = 'delivery-log-v40';
+const CACHE_NAME = 'delivery-log-v42';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './localforage.js',
+  './closures.js',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',

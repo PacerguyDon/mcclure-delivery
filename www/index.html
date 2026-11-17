@@ -14,6 +14,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="./localforage.js"></script>
+<script src="./closures.js"></script>
 <style>
   :root{
     --ink:#24262B;
@@ -357,6 +358,11 @@
     <button id="tabPrint">Send</button>
   </nav>
 
+  <div style="display:flex;gap:10px;padding:8px 14px;">
+    <button type="button" onclick="showClosures()" style="flex:1;padding:10px;">Upcoming closures</button>
+    <button type="button" onclick="editClosures()" style="flex:1;padding:10px;">Edit closures</button>
+  </div>
+
   <main>
     <!-- FORM VIEW -->
     <div id="formView">
@@ -676,6 +682,10 @@ async function setStops(date, stops) {
             // You will write your SQLite INSERT queries here using window.NativeDB
             // (e.g., await window.NativeDB.execute(`INSERT INTO route_stops...`))
             
+            // Temporary fallback until SQLite INSERT queries are written:
+            if (typeof localforage !== 'undefined') {
+                await localforage.setItem(keyFor(date), JSON.stringify(stops));
+            }
             return true;
         } else {
             // --- WEB BROWSER FALLBACK (iPhones/Safari) ---
