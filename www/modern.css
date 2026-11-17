@@ -1,0 +1,119 @@
+/* modern.css - loaded after the main <style>; overrides look only.
+   Print sheet (#printSheet, .p-*) is intentionally untouched. */
+:root{
+  /* ===== THEME: change these values to recolor the whole app ===== */
+  --brand:#16161A;          /* buttons, active tab, header */
+  --brand-2:#2B2B31;        /* second header gradient color */
+  --brand-dark:#000000;     /* pressed state */
+  --on-brand:#E3B53A;       /* text on top of the brand color */
+  --accent:#E3B53A;         /* highlights: focus ring, header underline */
+  --brand-tint:#F6EFD6;     /* pale chips and highlights */
+  --brand-rgb:22,22,26;
+  --accent-rgb:227,181,58;
+  /* Blue instead? Use these values:
+     --brand:#1D4E89; --brand-2:#2A6AB5; --brand-dark:#143A68; --on-brand:#FFFFFF;
+     --accent:#1D4E89; --brand-tint:#E3ECF7; --brand-rgb:29,78,137; --accent-rgb:29,78,137; */
+
+  --teal:var(--brand);
+  --teal-dark:var(--brand-dark);
+  --paper:#F3F2ED;
+  --line:#E3E0D6;
+  --radius:16px;
+  --shadow:0 1px 2px rgba(20,30,25,.06), 0 8px 22px rgba(20,30,25,.07);
+}
+body{background:var(--paper);}
+
+/* header */
+header.top{
+  padding:24px 20px 18px;
+  border-bottom:0;
+  color:#fff;
+  background:linear-gradient(135deg,var(--brand) 0%,var(--brand-2) 100%);
+  border-radius:0 0 24px 24px;
+  box-shadow:0 4px 0 var(--accent);
+}
+header.top:active{background:var(--brand-dark);}
+header.top h1{font-size:32px;color:#fff;}
+header.top .sub{color:rgba(255,255,255,.72);}
+header.top .sub strong{color:var(--accent);}
+
+/* tabs */
+nav.tabs{
+  padding:16px 14px 12px;
+  gap:8px;
+  border-bottom:0;
+  background:var(--paper);
+}
+nav.tabs button,
+nav.tabs button.active{
+  border-bottom:0;
+  border-radius:999px;
+  padding:11px 6px;
+  font-size:17px;
+}
+nav.tabs button{background:transparent;color:var(--muted);}
+nav.tabs button.active{
+  background:var(--brand);
+  color:var(--on-brand);
+  box-shadow:0 4px 12px rgba(var(--brand-rgb),.28);
+}
+
+/* cards */
+.panel,
+.stop-card{
+  border:0;
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+}
+.panel{padding:18px;}
+.stop-card .stop-head{padding:16px 18px;}
+.stop-thumb{border-radius:8px;}
+.stop-actions{border-top:1px solid var(--line);}
+.stop-actions button{padding:13px;font-size:15px;}
+
+/* form */
+label{
+  font-size:13px;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+}
+input[type=text], input[type=date], input[type=time]{
+  font-size:17px;
+  padding:14px 14px;
+  border:1.5px solid var(--line);
+  border-radius:12px;
+  background:#FBFBF8;
+}
+input[type=text]:focus, input[type=date]:focus, input[type=time]:focus{
+  outline:none;
+  border-color:var(--accent);
+  background:#fff;
+  box-shadow:0 0 0 4px rgba(var(--accent-rgb),.25);
+}
+.icon-btn{width:48px;height:48px;border-radius:12px;background:#FBFBF8;}
+.add-patient{
+  padding:14px;
+  border:1.5px dashed rgba(var(--accent-rgb),.75);
+  border-radius:12px;
+  background:rgba(var(--accent-rgb),.10);
+}
+.sig-wrap{border-radius:14px;border:1.5px solid var(--line);background:#FBFBF8;}
+.clear-link{font-size:15px;padding:6px 8px;}
+
+/* buttons */
+.form-actions{gap:12px;margin-top:18px;}
+.save-btn{
+  padding:17px;
+  border-radius:14px;
+  color:var(--on-brand);
+  box-shadow:0 8px 18px rgba(var(--brand-rgb),.28);
+}
+.save-btn:active{box-shadow:0 3px 8px rgba(var(--brand-rgb),.25);}
+.save-btn:disabled{box-shadow:none;color:#fff;}
+.reset-btn{padding:17px;border-radius:14px;}
+.print-btn{padding:16px;border-radius:14px;box-shadow:0 6px 16px rgba(20,30,25,.18);}
+
+/* small bits */
+.count-pill{padding:3px 11px;}
+.toast{border-radius:14px;box-shadow:0 10px 28px rgba(20,30,25,.25);padding:13px 22px;}
+.empty{padding:70px 20px;}

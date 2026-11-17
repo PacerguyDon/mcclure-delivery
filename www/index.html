@@ -343,6 +343,7 @@
   .p-meta{font-size:12px; color:#555;}
   .p-sig{width:130px; height:50px; border:1px solid #aaa; object-fit:contain; background:#fff;}
 </style>
+<link rel="stylesheet" href="./modern.css">
 </head>
 
  <body>
@@ -970,27 +971,33 @@ $('doPrint').onclick = async () => {
   updateTabCount(todayStr());
 
   // ---------- Automated Storage Cleanup (14-day rolling window) ----------
-  (function performAutomatedCleanup(){
-    const RETENTION_DAYS = 14; 
-    const now = new Date();
+  (async function performAutomatedCleanup(){
+    const RETENTION_DAYS = 14;
     const prefix = 'stops-';
-
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith(prefix)) {
-        const datePart = key.substring(prefix.length);
-        const parts = datePart.split('-');
-        const fileDate = new Date(parts[0], parts[1]-1, parts[2]);
-
-        if (!isNaN(fileDate.getTime())) {
-          const diffTime = now - fileDate;
-          const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-          if (diffDays > RETENTION_DAYS) {
-            localStorage.removeItem(key);
-          }
-        }
+    const now = new Date();
+    const isOld = key => {
+      if (!key || !key.startsWith(prefix)) return false;
+      const datePart = key.substring(prefix.length);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return false; // unknown format: leave it alone
+      const parts = datePart.split('-');
+      const fileDate = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      if (isNaN(fileDate.getTime())) return false;
+      return Math.floor((now - fileDate) / (1000 * 60 * 60 * 24)) > RETENTION_DAYS;
+    };
+    let removed = 0;
+    try {
+      // collect keys first: removing while looping by index skips entries
+      const lsKeys = [];
+      for (let i = 0; i < localStorage.length; i++) lsKeys.push(localStorage.key(i));
+      lsKeys.filter(isOld).forEach(k => { localStorage.removeItem(k); removed++; });
+    } catch (e) { console.warn('localStorage cleanup skipped', e); }
+    try {
+      if (typeof localforage !== 'undefined') {
+        const keys = await localforage.keys();
+        for (const k of keys.filter(isOld)) { await localforage.removeItem(k); removed++; }
       }
-    }
+    } catch (e) { console.warn('localforage cleanup skipped', e); }
+    console.log('Cleanup removed ' + removed + ' old day(s)');
   })();
 
   // ---------- Service Worker Registration ----------
