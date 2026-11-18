@@ -5,16 +5,58 @@
   const dayNum = d => Math.round(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
 
   // ---------- closure rules ----------
+  // pattern: 'weekly' | 'biweekly' | 'both' | 'alternate'; anchor is a Friday or Monday they are closed.
+  function ruleFor(c) {
+    const fri = toLocal(c.anchor).getDay() === 5;
+    switch (c.pattern) {
+      case 'weekly':    return { cycle: 7,  offsets: [0] };
+      case 'biweekly':  return { cycle: 14, offsets: [0] };
+      case 'both':      return { cycle: 14, offsets: fri ? [0, 3] : [0, 11] };   // Friday + Monday, same weekend
+      case 'alternate': return { cycle: 14, offsets: fri ? [0, 10] : [0, 4] };   // Friday one weekend, Monday the next
+    }
+    // older saved entries (everyDays / alsoMonday)
+    return { cycle: c.everyDays || 14, offsets: c.alsoMonday ? [0, 3] : [0] };
+  }
+  function patternOf(c) {
+    if (c.pattern) return c.pattern;
+    if (c.everyDays === 7) return 'weekly';
+    return c.alsoMonday ? 'both' : 'biweekly';
+  }
   function isClosed(c, date) {
     const key = iso(date);
     if (c.open && c.open.includes(key)) return false;
     if (c.extra && c.extra.includes(key)) return true;
+    const r = ruleFor(c);
     const diff = dayNum(date) - dayNum(toLocal(c.anchor));
-    if (diff % c.everyDays === 0) return true;
-    if (c.alsoMonday && (diff - 3) % c.everyDays === 0) return true;
-    return false;
+    const m = ((diff % r.cycle) + r.cycle) % r.cycle;
+    return r.offsets.includes(m);
   }
   const closedOn = (date, list) => list.filter(c => isClosed(c, date)).map(c => c.office);
+
+  const PATTERN_LABELS = {
+    weekly: 'Every week',
+    biweekly: 'Every other week',
+    both: 'Friday + Monday, every other week',
+    alternate: 'Alternating: Friday one week, Monday the next',
+  };
+  function describe(c) {
+    const day = toLocal(c.anchor).getDay() === 1 ? 'Monday' : 'Friday';
+    switch (patternOf(c)) {
+      case 'weekly': return 'Every ' + day;
+      case 'biweekly': return 'Every other ' + day;
+      case 'both': return 'Friday + Monday, every other week';
+      case 'alternate': return 'Alternating Friday / Monday';
+    }
+  }
+  function nextClosures(c, n) {
+    const out = [];
+    for (let i = 0; i <= 90 && out.length < n; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      if (isClosed(c, d)) out.push(d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }));
+    }
+    return out;
+  }
 
   // ---------- storage ----------
   async function loadClosures() {
@@ -107,6 +149,7 @@
       .cl-check { display: flex; align-items: center; gap: 10px; font-size: 16px; margin: 4px 0 14px; }
       .cl-check input { width: 22px; height: 22px; accent-color: var(--brand, #1d5c47); }
       .cl-actions { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+      .cl-preview { background: var(--brand-tint, #e6f0ea); border-radius: 12px; padding: 10px 12px; font-size: 15px; line-height: 1.4; margin: 2px 0 14px; }
       .cl-btn { flex: 1; min-height: 46px; border-radius: 12px; border: 1.5px solid var(--brand, #1d5c47); background: #fff; color: var(--brand, #1d5c47);
         font-size: 16px; font-weight: 600; font-family: inherit; padding: 0 14px; }
       .cl-btn.primary { background: var(--brand, #1d5c47); color: var(--on-brand, #fff); }
@@ -163,10 +206,9 @@
 
     const showList = () => {
       const cards = list.map((c, i) => {
-        const weeks = c.everyDays / 7;
         const start = toLocal(c.anchor).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        return '<div class="cl-card"><div><b>' + esc(c.office) + '</b><small>Every ' + (weeks === 1 ? 'week' : weeks + ' weeks') +
-          ' from ' + start + (c.alsoMonday ? ' + Monday' : '') + '</small></div>' +
+        return '<div class="cl-card"><div><b>' + esc(c.office) + '</b><small>' + describe(c) +
+          ' from ' + start + '</small></div>' +
           '<button class="cl-btn small" data-edit="' + i + '">Edit</button></div>';
       }).join('');
       dlg.innerHTML = '<div class="cl-wrap"><h3>Office closures</h3>' +
@@ -179,21 +221,38 @@
     };
 
     const showForm = i => {
-      const c = i >= 0 ? list[i] : { office: '', anchor: '', everyDays: 28, alsoMonday: false, extra: [], open: [] };
-      const cycleOptions = [7, 14, 21, 28, 35, 42].map(n =>
-        '<option value="' + n + '"' + (n === c.everyDays ? ' selected' : '') + '>' + (n === 7 ? 'Every week' : 'Every ' + (n / 7) + ' weeks') + '</option>'
+      const c = i >= 0 ? list[i] : { office: '', anchor: '', pattern: 'biweekly', extra: [], open: [] };
+      const cur = patternOf(c);
+      const options = Object.keys(PATTERN_LABELS).map(k =>
+        '<option value="' + k + '"' + (k === cur ? ' selected' : '') + '>' + PATTERN_LABELS[k] + '</option>'
       ).join('');
 
       dlg.innerHTML = '<div class="cl-wrap"><h3>' + (i >= 0 ? 'Edit office' : 'Add office') + '</h3>' +
         '<div class="cl-field"><label>Office name</label><input id="f-name" value="' + esc(c.office) + '"></div>' +
-        '<div class="cl-field"><label>A Friday they are closed</label><input id="f-anchor" type="date" value="' + c.anchor + '"></div>' +
-        '<div class="cl-field"><label>Repeats</label><select id="f-cycle">' + cycleOptions + '</select></div>' +
-        '<label class="cl-check"><input id="f-mon" type="checkbox"' + (c.alsoMonday ? ' checked' : '') + '> Also closed the Monday after</label>' +
+        '<div class="cl-field"><label>A day they are closed (Friday or Monday)</label><input id="f-anchor" type="date" value="' + c.anchor + '"></div>' +
+        '<div class="cl-field"><label>Schedule</label><select id="f-pattern">' + options + '</select></div>' +
+        '<div class="cl-preview" id="f-preview"></div>' +
         '<div class="cl-field"><label>One-off days off</label><input id="f-extra" placeholder="2026-12-24, 2027-01-04" value="' + esc((c.extra || []).join(', ')) + '"></div>' +
         '<div class="cl-field"><label>Open on these normal closure days</label><input id="f-open" placeholder="2026-12-25" value="' + esc((c.open || []).join(', ')) + '"></div>' +
         '<div class="cl-actions"><button class="cl-btn primary" id="save">Save</button>' +
         '<button class="cl-btn" id="cancel">Cancel</button>' +
         (i >= 0 ? '<button class="cl-btn danger" id="del">Delete</button>' : '') + '</div></div>';
+
+      const anchorEl = dlg.querySelector('#f-anchor');
+      const patternEl = dlg.querySelector('#f-pattern');
+      const previewEl = dlg.querySelector('#f-preview');
+      const refresh = () => {
+        const a = anchorEl.value;
+        if (!a) { previewEl.textContent = 'Pick a closed Friday or Monday to see the schedule.'; return; }
+        const wd = toLocal(a).getDay();
+        if (wd !== 5 && wd !== 1) { previewEl.textContent = 'That date is not a Friday or Monday.'; return; }
+        const next = nextClosures({ anchor: a, pattern: patternEl.value, extra: [], open: [] }, 6);
+        previewEl.innerHTML = '<b>Next closures:</b> ' + (next.length ? next.join(' &middot; ') : 'none in the next 3 months');
+      };
+      anchorEl.addEventListener('change', refresh);
+      anchorEl.addEventListener('input', refresh);
+      patternEl.addEventListener('change', refresh);
+      refresh();
 
       dlg.querySelector('#cancel').onclick = showList;
       if (i >= 0) {
@@ -203,14 +262,14 @@
         };
       }
       dlg.querySelector('#save').onclick = async () => {
-        const anchor = dlg.querySelector('#f-anchor').value;
+        const anchor = anchorEl.value;
         const name = dlg.querySelector('#f-name').value.trim();
         if (!name || !anchor) { alert('Enter a name and a date.'); return; }
-        if (toLocal(anchor).getDay() !== 5) { alert('That date is not a Friday.'); return; }
+        const wd = toLocal(anchor).getDay();
+        if (wd !== 5 && wd !== 1) { alert('Pick a Friday or a Monday.'); return; }
         const entry = {
           office: name, anchor: anchor,
-          everyDays: Number(dlg.querySelector('#f-cycle').value),
-          alsoMonday: dlg.querySelector('#f-mon').checked,
+          pattern: patternEl.value,
           extra: parseDates(dlg.querySelector('#f-extra').value),
           open: parseDates(dlg.querySelector('#f-open').value),
         };
