@@ -22,10 +22,17 @@
     if (c.everyDays === 7) return 'weekly';
     return c.alsoMonday ? 'both' : 'biweekly';
   }
+  function isNthWeekday(date, nth, dow) {
+    if (date.getDay() !== dow) return false;
+    const dom = date.getDate();
+    if (nth === -1) { const next = new Date(date); next.setDate(dom + 7); return next.getMonth() !== date.getMonth(); }
+    return Math.ceil(dom / 7) === nth;
+  }
   function isClosed(c, date) {
     const key = iso(date);
     if (c.open && c.open.includes(key)) return false;
     if (c.extra && c.extra.includes(key)) return true;
+    if (c.pattern === 'monthly') return (c.monthly || []).some(r => isNthWeekday(date, r.nth, r.dow));
     const r = ruleFor(c);
     const diff = dayNum(date) - dayNum(toLocal(c.anchor));
     const m = ((diff % r.cycle) + r.cycle) % r.cycle;
@@ -38,8 +45,12 @@
     biweekly: 'Every other week',
     both: 'Friday + Monday, every other week',
     alternate: 'Alternating: Friday one week, Monday the next',
+    monthly: 'Monthly (like first Friday, second Monday)',
   };
+  const NTH_NAMES = { '1': 'First', '2': 'Second', '3': 'Third', '4': 'Fourth', '-1': 'Last' };
+  const DOW_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   function describe(c) {
+    if (c.pattern === 'monthly') return (c.monthly || []).map(r => NTH_NAMES[r.nth] + ' ' + DOW_NAMES[r.dow]).join(' + ') + ' of the month';
     const day = toLocal(c.anchor).getDay() === 1 ? 'Monday' : 'Friday';
     switch (patternOf(c)) {
       case 'weekly': return 'Every ' + day;
@@ -150,6 +161,8 @@
       .cl-check input { width: 22px; height: 22px; accent-color: var(--brand, #1d5c47); }
       .cl-actions { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
       .cl-preview { background: var(--brand-tint, #e6f0ea); border-radius: 12px; padding: 10px 12px; font-size: 15px; line-height: 1.4; margin: 2px 0 14px; }
+      .cl-mrow { display: flex; gap: 8px; margin-bottom: 8px; }
+      .cl-mrow select { flex: 1; }
       .cl-btn { flex: 1; min-height: 46px; border-radius: 12px; border: 1.5px solid var(--brand, #1d5c47); background: #fff; color: var(--brand, #1d5c47);
         font-size: 16px; font-weight: 600; font-family: inherit; padding: 0 14px; }
       .cl-btn.primary { background: var(--brand, #1d5c47); color: var(--on-brand, #fff); }
@@ -208,7 +221,7 @@
       const cards = list.map((c, i) => {
         const start = toLocal(c.anchor).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         return '<div class="cl-card"><div><b>' + esc(c.office) + '</b><small>' + describe(c) +
-          ' from ' + start + '</small></div>' +
+          (c.pattern === 'monthly' ? '' : ' from ' + start) + '</small></div>' +
           '<button class="cl-btn small" data-edit="' + i + '">Edit</button></div>';
       }).join('');
       dlg.innerHTML = '<div class="cl-wrap"><h3>Office closures</h3>' +
@@ -226,11 +239,20 @@
       const options = Object.keys(PATTERN_LABELS).map(k =>
         '<option value="' + k + '"' + (k === cur ? ' selected' : '') + '>' + PATTERN_LABELS[k] + '</option>'
       ).join('');
+      const rules = (c.monthly && c.monthly.length) ? c.monthly : [{ nth: 1, dow: 5 }];
+      const mRow = (n, r) => {
+        const nthOpts = [[0, '(none)'], [1, 'First'], [2, 'Second'], [3, 'Third'], [4, 'Fourth'], [-1, 'Last']].map(o =>
+          '<option value="' + o[0] + '"' + (r && o[0] === r.nth ? ' selected' : '') + '>' + o[1] + '</option>').join('');
+        const dowOpts = [1, 2, 3, 4, 5].map(d =>
+          '<option value="' + d + '"' + (r && d === r.dow ? ' selected' : '') + '>' + DOW_NAMES[d] + '</option>').join('');
+        return '<div class="cl-mrow"><select id="m' + n + '-nth">' + nthOpts + '</select><select id="m' + n + '-dow">' + dowOpts + '</select></div>';
+      };
 
       dlg.innerHTML = '<div class="cl-wrap"><h3>' + (i >= 0 ? 'Edit office' : 'Add office') + '</h3>' +
         '<div class="cl-field"><label>Office name</label><input id="f-name" value="' + esc(c.office) + '"></div>' +
-        '<div class="cl-field"><label>A day they are closed (Friday or Monday)</label><input id="f-anchor" type="date" value="' + c.anchor + '"></div>' +
         '<div class="cl-field"><label>Schedule</label><select id="f-pattern">' + options + '</select></div>' +
+        '<div class="cl-field" id="f-anchor-field"><label>A day they are closed (Friday or Monday)</label><input id="f-anchor" type="date" value="' + (c.anchor || '') + '"></div>' +
+        '<div class="cl-field" id="f-monthly-field"><label>Closed on (every month)</label>' + mRow(1, rules[0]) + mRow(2, rules[1]) + '</div>' +
         '<div class="cl-preview" id="f-preview"></div>' +
         '<div class="cl-field"><label>One-off days off</label><input id="f-extra" placeholder="2026-12-24, 2027-01-04" value="' + esc((c.extra || []).join(', ')) + '"></div>' +
         '<div class="cl-field"><label>Open on these normal closure days</label><input id="f-open" placeholder="2026-12-25" value="' + esc((c.open || []).join(', ')) + '"></div>' +
@@ -241,17 +263,36 @@
       const anchorEl = dlg.querySelector('#f-anchor');
       const patternEl = dlg.querySelector('#f-pattern');
       const previewEl = dlg.querySelector('#f-preview');
+      const anchorField = dlg.querySelector('#f-anchor-field');
+      const monthlyField = dlg.querySelector('#f-monthly-field');
+      const readMonthly = () => [1, 2].map(n => ({
+        nth: Number(dlg.querySelector('#m' + n + '-nth').value),
+        dow: Number(dlg.querySelector('#m' + n + '-dow').value),
+      })).filter(r => r.nth !== 0);
+
       const refresh = () => {
-        const a = anchorEl.value;
-        if (!a) { previewEl.textContent = 'Pick a closed Friday or Monday to see the schedule.'; return; }
-        const wd = toLocal(a).getDay();
-        if (wd !== 5 && wd !== 1) { previewEl.textContent = 'That date is not a Friday or Monday.'; return; }
-        const next = nextClosures({ anchor: a, pattern: patternEl.value, extra: [], open: [] }, 6);
+        const monthly = patternEl.value === 'monthly';
+        anchorField.style.display = monthly ? 'none' : '';
+        monthlyField.style.display = monthly ? '' : 'none';
+        let entry;
+        if (monthly) {
+          const rs = readMonthly();
+          if (!rs.length) { previewEl.textContent = 'Pick at least one day of the month.'; return; }
+          entry = { pattern: 'monthly', monthly: rs, extra: [], open: [] };
+        } else {
+          const a = anchorEl.value;
+          if (!a) { previewEl.textContent = 'Pick a closed Friday or Monday to see the schedule.'; return; }
+          const wd = toLocal(a).getDay();
+          if (wd !== 5 && wd !== 1) { previewEl.textContent = 'That date is not a Friday or Monday.'; return; }
+          entry = { anchor: a, pattern: patternEl.value, extra: [], open: [] };
+        }
+        const next = nextClosures(entry, 6);
         previewEl.innerHTML = '<b>Next closures:</b> ' + (next.length ? next.join(' &middot; ') : 'none in the next 3 months');
       };
       anchorEl.addEventListener('change', refresh);
       anchorEl.addEventListener('input', refresh);
       patternEl.addEventListener('change', refresh);
+      dlg.querySelectorAll('#f-monthly-field select').forEach(el => el.addEventListener('change', refresh));
       refresh();
 
       dlg.querySelector('#cancel').onclick = showList;
@@ -262,17 +303,25 @@
         };
       }
       dlg.querySelector('#save').onclick = async () => {
-        const anchor = anchorEl.value;
         const name = dlg.querySelector('#f-name').value.trim();
-        if (!name || !anchor) { alert('Enter a name and a date.'); return; }
-        const wd = toLocal(anchor).getDay();
-        if (wd !== 5 && wd !== 1) { alert('Pick a Friday or a Monday.'); return; }
+        if (!name) { alert('Enter a name.'); return; }
         const entry = {
-          office: name, anchor: anchor,
+          office: name,
           pattern: patternEl.value,
           extra: parseDates(dlg.querySelector('#f-extra').value),
           open: parseDates(dlg.querySelector('#f-open').value),
         };
+        if (entry.pattern === 'monthly') {
+          entry.monthly = readMonthly();
+          if (!entry.monthly.length) { alert('Pick at least one day of the month.'); return; }
+          entry.anchor = '';
+        } else {
+          const anchor = anchorEl.value;
+          if (!anchor) { alert('Enter a date.'); return; }
+          const wd = toLocal(anchor).getDay();
+          if (wd !== 5 && wd !== 1) { alert('Pick a Friday or a Monday.'); return; }
+          entry.anchor = anchor;
+        }
         if (i >= 0) list[i] = entry; else list.push(entry);
         await save();
         showList();
