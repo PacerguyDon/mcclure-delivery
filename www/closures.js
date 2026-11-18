@@ -110,7 +110,7 @@
       .cl-btn { flex: 1; min-height: 46px; border-radius: 12px; border: 1.5px solid var(--brand, #1d5c47); background: #fff; color: var(--brand, #1d5c47);
         font-size: 16px; font-weight: 600; font-family: inherit; padding: 0 14px; }
       .cl-btn.primary { background: var(--brand, #1d5c47); color: var(--on-brand, #fff); }
-      .cl-btn.danger { border-color: #b5651d; color: #b5651d; }
+      .cl-btn.danger { border-color: var(--rust, #b5651d); color: var(--rust, #b5651d); }
       .cl-btn.small { flex: none; min-height: 38px; padding: 0 16px; }
     `;
     document.head.appendChild(st);
